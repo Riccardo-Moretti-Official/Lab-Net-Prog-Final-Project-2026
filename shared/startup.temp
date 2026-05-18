@@ -45,3 +45,8 @@ modbusclient
 observer 
 s2 
 s1 
+modbusclient 
+modbusserver 
+observer 
+s2 
+s1 
