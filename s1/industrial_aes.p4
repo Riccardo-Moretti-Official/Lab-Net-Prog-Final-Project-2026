@@ -12,6 +12,7 @@ const bit<16> TYPE_IPV4 = 0x800;
 const bit<16> IPV4_LEN = 16w20;
 
 typedef bit<9>  egressSpec_t;
+const egressSpec_t OBSERVER_PORT = 3;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
@@ -83,6 +84,10 @@ header payload_t {
    varbit<2048> content;
 }
 
+header modbus_pdu_t {
+   bit<8> functionCode;
+}
+
 header payload_encrypt_t {
    bit<2048> content;
 }
@@ -114,6 +119,7 @@ struct headers {
     tcp_t tcp;
     tcp_options_t tcp_options;
     modbus_tcp_t modbus_tcp;
+    modbus_pdu_t modbus_pdu;
     payload_t payload;
     payload_encrypt_t payload_encrypt;
     payload_decrypt_t payload_decrypt;
@@ -203,13 +209,18 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.modbus_tcp);
         transition select(hdr.modbus_tcp.length) {
            1: accept;
-           _: parse_payload_modbus;
+           _: parse_modbus_pdu;
         }
+    }
+
+    state parse_modbus_pdu {
+        packet.extract(hdr.modbus_pdu);
+        transition parse_payload_modbus;
     }
 
     state parse_payload_modbus {
         bit<32> calculated_length = (bit<32>)((hdr.ipv4.totalLen - (((bit<16>)hdr.ipv4.ihl) * 4) - (((bit<16>)hdr.tcp.dataOffset) * 4) - 7) * 8);
-        packet.extract(hdr.payload, (bit<32>)(calculated_length));
+        packet.extract(hdr.payload, (bit<32>)(calculated_length - 8));
         transition accept;
     }
 }
@@ -308,6 +319,22 @@ control MyIngress(inout headers hdr,
         hdr.ipv4_options.setInvalid();
     }
 
+    action mirror_to_observer() {
+        clone(CloneType.I2E, (bit<32>)1);
+    }
+
+    table mirror_table {
+        key = {
+            hdr.modbus_pdu.functionCode: exact;
+        }
+        actions = {
+            mirror_to_observer;
+            NoAction;
+        }
+        size = 2;
+        default_action = NoAction();
+    }
+
     table modbus_sec {
         key = {
             standard_metadata.egress_spec: exact;
@@ -326,6 +353,9 @@ control MyIngress(inout headers hdr,
             ipv4_lpm.apply();
             if (hdr.tcp.isValid()){
                 if (hdr.modbus_tcp.isValid()){
+                    if (hdr.modbus_pdu.isValid()) {
+                        mirror_table.apply();
+                    }
                     modbus_sec.apply();
                 }
             }
@@ -413,6 +443,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.tcp);
         packet.emit(hdr.tcp_options);
         packet.emit(hdr.modbus_tcp);
+        packet.emit(hdr.modbus_pdu);
         packet.emit(hdr.payload_encrypt);
         packet.emit(hdr.payload_decrypt);
         packet.emit(hdr.payload);

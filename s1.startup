@@ -1,6 +1,8 @@
 ip link set eth0 address 00:00:00:00:00:01
 ip link set eth1 address 00:00:00:00:00:02
 ip link set eth2 address 00:00:00:00:01:11
+ip link set eth3 address 00:00:00:00:00:06
+ip link set eth3 up
 ip addr add 100.0.1.11/24 dev eth2
 arp -i eth2 -s 100.0.1.5 00:00:00:00:01:05
 cp sshd_config /etc/ssh/
@@ -13,7 +15,7 @@ cd extern_lib && make
 cd ..
 echo '' > /shared/s1.log
 #simple_switch -i 1@eth0 -i 2@eth1 industrial_aes.json --log-console -- --load-modules=extern_lib/definition.so > /shared/s1.log 2>&1 &
-simple_switch -i 1@eth0 -i 2@eth1 industrial_aes.json --log-console -- --load-modules=extern_lib/definition.so &
+simple_switch -i 1@eth0 -i 2@eth1 -i 3@eth3 industrial_aes.json --log-console -- --load-modules=extern_lib/definition.so &
 while [[ $(pgrep simple_switch) -eq 0 ]]; do sleep 1; done
 until simple_switch_CLI <<< "help"; do sleep 1; done
 

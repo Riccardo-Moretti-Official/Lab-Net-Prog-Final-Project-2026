@@ -11,14 +11,13 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
-repositories {
-    mavenCentral()
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
-    }
+repositories {
+    mavenCentral()
 }
 
 dependencies {
